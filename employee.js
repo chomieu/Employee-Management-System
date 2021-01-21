@@ -1,5 +1,6 @@
 var mysql = require("mysql");
 var inquirer = require("inquirer");
+const { ADDRCONFIG } = require("dns");
 
 var connection = mysql.createConnection({
   host: "localhost",
@@ -22,13 +23,36 @@ function initialize() {
     choices: ["Add", "View", "Update", "Remove", "Quit"]
   }, {
     type: "list",
-    name: "db",
-    when: res => { return res.task !== "Quit" },
-    message: res => { return `${res.task.replace(/e$/, "")}ing:` },
+    name: "table",
+    when: ans => { return ans.task !== "Quit" },
+    message: ans => { return `${ans.task.replace(/e$/, "")}ing:` },
     choices: ["Employee", "Role", "Department"]
-  }]).then(response => {
-    
+  }]).then(res => {
+    const chosen = res.table.toLowerCase()
+    switch (res.task) {
+      case "Add": add(chosen); break
+      case "View": view(chosen); break
+      case "Update": update(chosen); break
+      case "Remove": remove(chosen); break
+      case "Quit": connection.end()
+    }
   })
+}
+
+function add() {
+
+}
+
+function view() {
+
+}
+
+function update() {
+
+}
+
+function remove() {
+  
 }
 
 initialize()
