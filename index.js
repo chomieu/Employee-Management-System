@@ -55,8 +55,8 @@ function mainMenu() {
     switch (res.task) {
       case "Add": add(res.param, "INSERT INTO"); break
       case "View": print(display); break
-      case "Update": update(res.param); break
-      // case "Remove": remove(res.param); break
+      case "Update": update(res.param, "UPDATE"); break
+      case "Remove": update(res.param, "DELETE"); break
       case "Quit": db.end()
     }
   })
@@ -87,20 +87,20 @@ function add(param, task, target) {
   }]).then(async res => {
     var id = Object.keys(res)[2]
     var query = `${task} ${param} SET ?`
-    if (id !== null) {
-      res[id] = await getID(table[param][2], res[id])
-      if (task === "UPDATE") {
-        query = query + " WHERE " + table[param][0] + ` = "${target}"`
-      }
-      db.query(query, { ...res }, (err, res) => {
-        if (err) throw err
-        print(display)
-      })
+    if (task === "UPDATE") {
+      query = query + " WHERE " + table[param][0] + ` = "${target}"`
     }
+    if (id) {
+      res[id] = await getID(table[param][2], res[id])
+    }
+    db.query(query, { ...res }, (err, res) => {
+      if (err) throw err
+      print(display)
+    })
   })
 }
 
-function update(param) {
+function update(param, task) {
   var arr = []
   db.query(`SELECT * FROM ${param}`, (err, res) => {
     if (err) throw err
@@ -123,7 +123,14 @@ function update(param) {
       message: `Select ${param}:`,
       choices: arr
     }).then(res => {
-      add(param, "UPDATE", res.changes.split(" ")[0])
+      if (task === "UPDATE") {
+        add(param, task, res.changes.split(" ")[0])
+      } else {
+        db.query(`${task} FROM ${param} WHERE ` + table[param][0] + ` = "${res.changes.split(" ")[0]}"`, (err, res) => {
+          if (err) throw err
+          print(display)
+        })
+      }
     })
   })
 }
