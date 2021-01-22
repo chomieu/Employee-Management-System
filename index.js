@@ -53,9 +53,9 @@ function mainMenu() {
   }]).then(res => {
     select(res.param)
     switch (res.task) {
-      case "Add": add(res.param); break
+      case "Add": add(res.param, "INSERT INTO"); break
       case "View": print(display); break
-      // case "Update": update(res.param); break
+      case "Update": update(res.param); break
       // case "Remove": remove(res.param); break
       case "Quit": db.end()
     }
@@ -68,7 +68,7 @@ const table = {
   department: ["department", "", "employee"]
 }
 
-function add(param) {
+function add(param, task, target) {
   inquirer.prompt([{
     type: "input",
     name: table[param][0],
@@ -86,9 +86,13 @@ function add(param) {
     choices: makeList(table[param][2])
   }]).then(async res => {
     var id = Object.keys(res)[2]
+    var query = `${task} ${param} SET ?`
     if (id !== null) {
       res[id] = await getID(table[param][2], res[id])
-      db.query(`INSERT INTO ${param} SET ?`, { ...res }, (err, res) => {
+      if (task === "UPDATE") {
+        query = query + " WHERE " + table[param][0] + ` = "${target}"`
+      }
+      db.query(query, { ...res }, (err, res) => {
         if (err) throw err
         print(display)
       })
@@ -96,11 +100,39 @@ function add(param) {
   })
 }
 
+function update(param) {
+  var arr = []
+  db.query(`SELECT * FROM ${param}`, (err, res) => {
+    if (err) throw err
+    for (i = 0; i < res.length; i++) {
+      switch (param) {
+        case "employee":
+          arr.push(`${res[i].first_name} ${res[i].last_name}`)
+          break
+        case "role":
+          arr.push(res[i].title)
+          break
+        case "department":
+          arr.push(res[i].department)
+          break
+      }
+    }
+    inquirer.prompt({
+      type: "list",
+      name: "changes",
+      message: `Select ${param}:`,
+      choices: arr
+    }).then(res => {
+      add(param, "UPDATE", res.changes.split(" ")[0])
+    })
+  })
+}
+
 function select(param) {
-  const arr = ["e.id, e.first_name, e.last_name, r.title, d.department, r.salary",
+  const query = ["e.id, e.first_name, e.last_name, r.title, d.department, r.salary",
     "e JOIN role r ON e.role_id = r.id JOIN department d ON r.department_id = d.id"]
   switch (param) {
-    case "employee": display = `SELECT ${arr[0]} FROM ${param} ${arr[1]} ORDER BY e.id`; break
+    case "employee": display = `SELECT ${query[0]} FROM ${param} ${query[1]} ORDER BY e.id`; break
     default: display = `SELECT * FROM ${param} ORDER BY id`; break
   }
 }
