@@ -55,7 +55,7 @@ function initialize() {
     switch (res.task) {
       case "Add": add(res.table); break
       case "View": print(query); break
-      case "Update": update(res.table); break
+      // case "Update": update(res.table); break
       // case "Remove": remove(res.table); break
       case "Quit": db.end()
     }
@@ -69,7 +69,7 @@ const questions = {
 }
 
 
-function add(table, input) {
+function add(table) {
   inquirer.prompt([{
     type: "input",
     name: questions[table][0],
@@ -87,6 +87,7 @@ function add(table, input) {
     choices: makeList(questions[table][2]),
     filter: ans => getID(questions[table][2], ans)
   }]).then(res => {
+    console.log(res)
     db.query(`INSERT INTO ${table} SET ?`, {...res}, (err, res) => {})
     print(query)
   })
@@ -132,23 +133,14 @@ function makeList(input) {
   return arr
 }
 
-function getID(table, input) {
-  var id = 1
-  db.query(`SELECT * FROM ${table} WHERE ${questions[table][0]} = "${input}"`, (err, res) => {
-    if (err) throw err
-    id = res[0].id
+async function getID(table, input) {
+  const promise = new Promise((resolve, reject) => {
+    db.query(`SELECT * FROM ${table} WHERE ${questions[table][0]} = "${input}"`, (err, res) => {
+      if (err) throw err
+      resolve(res[0].id)
+    })
   })
-  return id
-}
-
-function update(table) {
-  inquirer.prompt([{
-    type: "list",
-    name: "change",
-    message: `Select ${table}:`,
-    choices: makeList(table),
-  }]).then()
-  
+  return await promise
 }
 
 // function remove(table) {
