@@ -32,12 +32,12 @@ db.connect(err => {
     "|____________________________________________________________|\n"
   ]
   console.log(logo.join("\n"))
-  initialize()
+  mainMenu()
 })
 
-var query
+var display
 
-function initialize() {
+function mainMenu() {
   inquirer.prompt([{
     type: "list",
     name: "task",
@@ -45,70 +45,73 @@ function initialize() {
     choices: ["Add", "View", "Update", "Remove", "Quit"]
   }, {
     type: "list",
-    name: "table",
+    name: "param",
     when: ans => { return ans.task !== "Quit" },
     message: ans => { return `${ans.task.replace(/e$/, "")}ing:` },
     choices: ["Employee", "Role", "Department"],
     filter: ans => { return ans.toLowerCase() }
   }]).then(res => {
-    select(res.table)
+    select(res.param)
     switch (res.task) {
-      case "Add": add(res.table); break
-      case "View": print(query); break
-      // case "Update": update(res.table); break
-      // case "Remove": remove(res.table); break
+      case "Add": add(res.param); break
+      case "View": print(display); break
+      // case "Update": update(res.param); break
+      // case "Remove": remove(res.param); break
       case "Quit": db.end()
     }
   })
 }
 
-const questions = {
+const table = {
   employee: ["first_name", "last_name", "role"],
   role: ["title", "salary", "department"],
   department: ["department", "", "employee"]
 }
 
-
-function add(table) {
+function add(param) {
   inquirer.prompt([{
     type: "input",
-    name: questions[table][0],
-    message: `Enter ${questions[table][0]}:`
+    name: table[param][0],
+    message: `Enter ${table[param][0]}:`
   }, {
     type: "input",
-    name: questions[table][1],
-    when: table !== "department",
-    message: `Enter ${questions[table][1]}:`
+    name: table[param][1],
+    when: param !== "department",
+    message: `Enter ${table[param][1]}:`
   }, {
     type: "list",
-    name: questions[table][2].concat("_id"),
-    when: table !== "department",
-    message: `Select ${questions[table][2]}:`,
-    choices: makeList(questions[table][2]),
-    filter: ans => getID(questions[table][2], ans)
-  }]).then(res => {
-    console.log(res)
-    db.query(`INSERT INTO ${table} SET ?`, {...res}, (err, res) => {})
-    print(query)
+    name: table[param][2].concat("_id"),
+    when: param !== "department",
+    message: `Select ${table[param][2]}:`,
+    choices: makeList(table[param][2])
+  }]).then(async res => {
+    var id = Object.keys(res)[2]
+    if (id !== null) {
+      res[id] = await getID(table[param][2], res[id])
+      db.query(`INSERT INTO ${param} SET ?`, { ...res }, (err, res) => {
+        if (err) throw err
+        print(display)
+      })
+    }
   })
 }
 
-function select(table) {
+function select(param) {
   const arr = ["e.id, e.first_name, e.last_name, r.title, d.department, r.salary",
     "e JOIN role r ON e.role_id = r.id JOIN department d ON r.department_id = d.id"]
-  switch (table) {
-    case "employee": query = `SELECT ${arr[0]} FROM ${table} ${arr[1]}`; break
-    default: query = `SELECT * FROM ${table}`; break
+  switch (param) {
+    case "employee": display = `SELECT ${arr[0]} FROM ${param} ${arr[1]} ORDER BY e.id`; break
+    default: display = `SELECT * FROM ${param} ORDER BY id`; break
   }
 }
 
-function print(query) {
-  db.query(query, (err, res) => {
+function print(display) {
+  db.query(display, (err, res) => {
     if (err) throw err
     console.log(" ")
     console.table(res)
     console.log(" ")
-    initialize()
+    mainMenu()
   })
 }
 
@@ -133,16 +136,11 @@ function makeList(input) {
   return arr
 }
 
-async function getID(table, input) {
-  const promise = new Promise((resolve, reject) => {
-    db.query(`SELECT * FROM ${table} WHERE ${questions[table][0]} = "${input}"`, (err, res) => {
+function getID(param, input) {
+  return new Promise((resolve, reject) => {
+    db.query(`SELECT * FROM ${param} WHERE ${table[param][0]} = "${input.split(" ")[0]}"`, (err, res) => {
       if (err) throw err
       resolve(res[0].id)
     })
   })
-  return await promise
 }
-
-// function remove(table) {
-//   db.query(`DELETE FROM ${ table } WHERE ?`, {})
-// }
