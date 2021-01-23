@@ -35,11 +35,11 @@ db.connect(err => {
     "|____________________________________________________________|\n"
   ]
   console.log(logo.join("\n"))
-  mainMenu()
+  main()
 })
 
 // Prompts user for task and table choice then calls a function accordingly
-function mainMenu() {
+function main() {
   inquirer.prompt([{
     type: "list",
     name: "task",
@@ -55,11 +55,9 @@ function mainMenu() {
   }]).then(res => {
     select(res.chosen)
     switch (res.task) {
-      case "Add": add(res.chosen, "INSERT INTO"); break
       case "View": print(display); break
-      case "Update": update(res.chosen, "UPDATE"); break
-      case "Remove": update(res.chosen, "DELETE"); break
-      case "Quit": db.end()
+      case "Quit": db.end(); break
+      default: list(res.task, res.chosen)
     }
   })
 }
@@ -75,12 +73,30 @@ const table = { // Global constant for chosen tables
 function select(chosen) {
   const query = ["e.id, e.first_name, e.last_name, r.title, d.department, r.salary",
     "e JOIN role r ON e.role_id = r.id JOIN department d ON r.department_id = d.id"]
-  if (chosen !== "employee") { display = `SELECT * FROM ${chosen} ORDER BY id` }
-  else { display = `SELECT ${query[0]} FROM ${chosen} ${query[1]} ORDER BY e.id` }
+  chosen !== "employee" ?
+    display = `SELECT * FROM ${chosen} ORDER BY id` :
+    display = `SELECT ${query[0]} FROM ${chosen} ${query[1]} ORDER BY e.id`
 }
 
-// Adds an item to the chosen table 
-function add(chosen, task, target) {
+function list(task, chosen, target) {
+  var key, arr = []
+  task === "Add" ? key = table[chosen][2] : key = chosen
+
+  db.query(`SELECT * FROM ${key}`, async (err, res) => {
+    if (err) throw err
+    for await (i of res) {
+      switch (key) {
+        case "role": arr.push(i.title); break
+        case "department": arr.push(i.department); break
+        default: arr.push(`${i.first_name} ${i.last_name}`)
+      }
+    }
+    task === "Add" ?
+      add(chosen, arr, target) : update(task, chosen, arr)
+  })
+}
+
+function add(chosen, arr, target) {
   inquirer.prompt([{
     type: "input",
     name: table[chosen][0],
@@ -95,15 +111,15 @@ function add(chosen, task, target) {
     name: table[chosen][2].concat("_id"),
     when: chosen !== "department",
     message: `Select ${table[chosen][2]}:`,
-    choices: makeList(table[chosen][2])
+    choices: arr
   }]).then(async res => {
-    var id = Object.keys(res)[2] // keyword for ID is required for adding or updating employee/role
-    var query = `${task} ${chosen} SET ?` // Basic query
-    if (task === "UPDATE") { // If task is update, add extra variables to target the item
-      query = query + " WHERE " + table[chosen][0] + ` = "${target}"`
-    }
-    if (id) { // if the keyword for ID is not null (chosen = employee/role) fetch the actual ID
+    var id = Object.keys(res)[2]
+    if (id) {
       res[id] = await getID(table[chosen][2], res[id])
+    }
+    var query = `INSERT INTO ${chosen} SET ?`
+    if (target) {
+      query = `UPDATE ${chosen} SET ? WHERE ${table[chosen][0]} = "${target}"`
     }
     db.query(query, { ...res }, (err, res) => {
       if (err) throw err
@@ -112,39 +128,22 @@ function add(chosen, task, target) {
   })
 }
 
-// Updates or delete an item from the chosen table
-function update(chosen, task) {
-  var arr = []
-  db.query(`SELECT * FROM ${chosen}`, (err, res) => {
-    if (err) throw err
-    for (i = 0; i < res.length; i++) {
-      switch (chosen) {
-        case "employee":
-          arr.push(`${res[i].first_name} ${res[i].last_name}`)
-          break
-        case "role":
-          arr.push(res[i].title)
-          break
-        case "department":
-          arr.push(res[i].department)
-          break
-      }
-    }
-    inquirer.prompt({
-      type: "list",
-      name: "changes",
-      message: `Select ${chosen}:`,
-      choices: arr
-    }).then(res => {
-      if (task === "UPDATE") {
-        add(chosen, task, res.changes.split(" ")[0])
-      } else {
-        db.query(`${task} FROM ${chosen} WHERE ` + table[chosen][0] + ` = "${res.changes.split(" ")[0]}"`, (err, res) => {
+function update(task, chosen, arr) {
+  inquirer.prompt({
+    type: "list",
+    name: "item",
+    message: `Select ${chosen}:`,
+    choices: arr
+  }).then(res => {
+    if (task === "Update") {
+      list("Add", chosen, res.item.split(" ")[0])
+    } else {
+      var query = `DELETE FROM ${chosen} WHERE ${table[chosen][0]} = "${res.item.split(" ")[0]}"`
+      db.query(query, (err, res) => {
           if (err) throw err
           print(display)
         })
-      }
-    })
+    }
   })
 }
 
@@ -155,36 +154,15 @@ function print(display) {
     console.log(" ")
     console.table(res)
     console.log(" ")
-    mainMenu()
+    main()
   })
-}
-
-// Creates a list based on the given input
-function makeList(input) {
-  var arr = []
-  db.query(`SELECT * FROM ${input}`, (err, res) => {
-    if (err) throw err
-    for (i = 0; i < res.length; i++) {
-      switch (input) {
-        case "employee":
-          arr.push(`${res[i].first_name} ${res[i].last_name}`)
-          break
-        case "role":
-          arr.push(res[i].title)
-          break
-        case "department":
-          arr.push(res[i].department)
-          break
-      }
-    }
-  })
-  return arr
 }
 
 // Gets an ID that matches the input
 function getID(chosen, input) {
   return new Promise((resolve, reject) => {
-    db.query(`SELECT * FROM ${chosen} WHERE ${table[chosen][0]} = "${input.split(" ")[0]}"`, (err, res) => {
+    var query = `SELECT * FROM ${chosen} WHERE ${table[chosen][0]} = "${input.split(" ")[0]}"`
+    db.query(query, (err, res) => {
       if (err) throw err
       resolve(res[0].id)
     })
