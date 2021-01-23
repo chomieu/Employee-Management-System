@@ -1,7 +1,9 @@
+// Dependencies
 const mysql = require("mysql")
 const inquirer = require("inquirer")
 const ct = require("console.table");
 
+// Defines a variable for database connection
 var db = mysql.createConnection({
   host: "localhost",
   port: 3306,
@@ -10,6 +12,7 @@ var db = mysql.createConnection({
   database: "employeeDB"
 });
 
+// Connects to the database and initialize the app
 db.connect(err => {
   if (err) throw err
   const logo = [
@@ -35,8 +38,7 @@ db.connect(err => {
   mainMenu()
 })
 
-var display
-
+// Prompts user for task and table choice then calls a function accordingly
 function mainMenu() {
   inquirer.prompt([{
     type: "list",
@@ -45,53 +47,63 @@ function mainMenu() {
     choices: ["Add", "View", "Update", "Remove", "Quit"]
   }, {
     type: "list",
-    name: "param",
-    when: ans => { return ans.task !== "Quit" },
+    name: "chosen",
     message: ans => { return `${ans.task.replace(/e$/, "")}ing:` },
     choices: ["Employee", "Role", "Department"],
+    when: ans => { return ans.task !== "Quit" },
     filter: ans => { return ans.toLowerCase() }
   }]).then(res => {
-    select(res.param)
+    select(res.chosen)
     switch (res.task) {
-      case "Add": add(res.param, "INSERT INTO"); break
+      case "Add": add(res.chosen, "INSERT INTO"); break
       case "View": print(display); break
-      case "Update": update(res.param, "UPDATE"); break
-      case "Remove": update(res.param, "DELETE"); break
+      case "Update": update(res.chosen, "UPDATE"); break
+      case "Remove": update(res.chosen, "DELETE"); break
       case "Quit": db.end()
     }
   })
 }
 
-const table = {
+var display // Global variable for viewing tables
+const table = { // Global constant for chosen tables
   employee: ["first_name", "last_name", "role"],
   role: ["title", "salary", "department"],
   department: ["department", "", "employee"]
 }
 
-function add(param, task, target) {
+// Selects query and sets global variable "display" for viewing tables
+function select(chosen) {
+  const query = ["e.id, e.first_name, e.last_name, r.title, d.department, r.salary",
+    "e JOIN role r ON e.role_id = r.id JOIN department d ON r.department_id = d.id"]
+  if (chosen !== "employee") { display = `SELECT * FROM ${chosen} ORDER BY id` }
+  else { display = `SELECT ${query[0]} FROM ${chosen} ${query[1]} ORDER BY e.id` }
+}
+
+// Adds an item to the chosen table 
+function add(chosen, task, target) {
   inquirer.prompt([{
     type: "input",
-    name: table[param][0],
-    message: `Enter ${table[param][0]}:`
+    name: table[chosen][0],
+    message: `Enter ${table[chosen][0]}:`
   }, {
     type: "input",
-    name: table[param][1],
-    when: param !== "department",
-    message: `Enter ${table[param][1]}:`
+    name: table[chosen][1],
+    when: chosen !== "department",
+    message: `Enter ${table[chosen][1]}:`
   }, {
     type: "list",
-    name: table[param][2].concat("_id"),
-    when: param !== "department",
-    message: `Select ${table[param][2]}:`,
-    choices: makeList(table[param][2])
+    name: table[chosen][2].concat("_id"),
+    when: chosen !== "department",
+    message: `Select ${table[chosen][2]}:`,
+    choices: makeList(table[chosen][2])
   }]).then(async res => {
-    var id = Object.keys(res)[2]
-    var query = `${task} ${param} SET ?`
-    if (task === "UPDATE") {
-      query = query + " WHERE " + table[param][0] + ` = "${target}"`
+    var id = Object.keys(res)[2] // keyword for ID is required for adding or updating employee/role
+    var query = `${task} ${chosen} SET ?` // Basic query
+    if (task === "UPDATE") { // If task is update, add extra variables to target the item
+      query = query + " WHERE " + table[chosen][0] + ` = "${target}"`
     }
-    if (id) {
-      res[id] = await getID(table[param][2], res[id])
+    if (id) { // if the keyword for ID is not null (chosen = employee/role) fetch the actual ID
+      res[id] = await getID(table[chosen][2], res[id])
     }
     db.query(query, { ...res }, (err, res) => {
       if (err) throw err
@@ -100,12 +112,13 @@ function add(param, task, target) {
   })
 }
 
-function update(param, task) {
+// Updates or delete an item from the chosen table
+function update(chosen, task) {
   var arr = []
-  db.query(`SELECT * FROM ${param}`, (err, res) => {
+  db.query(`SELECT * FROM ${chosen}`, (err, res) => {
     if (err) throw err
     for (i = 0; i < res.length; i++) {
-      switch (param) {
+      switch (chosen) {
         case "employee":
           arr.push(`${res[i].first_name} ${res[i].last_name}`)
           break
@@ -120,13 +133,13 @@ function update(param, task) {
     inquirer.prompt({
       type: "list",
       name: "changes",
-      message: `Select ${param}:`,
+      message: `Select ${chosen}:`,
       choices: arr
     }).then(res => {
       if (task === "UPDATE") {
-        add(param, task, res.changes.split(" ")[0])
+        add(chosen, task, res.changes.split(" ")[0])
       } else {
-        db.query(`${task} FROM ${param} WHERE ` + table[param][0] + ` = "${res.changes.split(" ")[0]}"`, (err, res) => {
+        db.query(`${task} FROM ${chosen} WHERE ` + table[chosen][0] + ` = "${res.changes.split(" ")[0]}"`, (err, res) => {
           if (err) throw err
           print(display)
         })
@@ -135,15 +148,7 @@ function update(param, task) {
   })
 }
 
-function select(param) {
-  const query = ["e.id, e.first_name, e.last_name, r.title, d.department, r.salary",
-    "e JOIN role r ON e.role_id = r.id JOIN department d ON r.department_id = d.id"]
-  switch (param) {
-    case "employee": display = `SELECT ${query[0]} FROM ${param} ${query[1]} ORDER BY e.id`; break
-    default: display = `SELECT * FROM ${param} ORDER BY id`; break
-  }
-}
-
+// Prints chosen table to the console
 function print(display) {
   db.query(display, (err, res) => {
     if (err) throw err
@@ -154,6 +159,7 @@ function print(display) {
   })
 }
 
+// Creates a list based on the given input
 function makeList(input) {
   var arr = []
   db.query(`SELECT * FROM ${input}`, (err, res) => {
@@ -175,9 +181,10 @@ function makeList(input) {
   return arr
 }
 
-function getID(param, input) {
+// Gets an ID that matches the input
+function getID(chosen, input) {
   return new Promise((resolve, reject) => {
-    db.query(`SELECT * FROM ${param} WHERE ${table[param][0]} = "${input.split(" ")[0]}"`, (err, res) => {
+    db.query(`SELECT * FROM ${chosen} WHERE ${table[chosen][0]} = "${input.split(" ")[0]}"`, (err, res) => {
       if (err) throw err
       resolve(res[0].id)
     })
