@@ -9,7 +9,7 @@ VALUES
 INSERT INTO `role` (title, salary, department_id)
 VALUES 
 ("CEO", "500000", "1"),
-("CTO", "250000", "2"),
+("CTO", "250000", "1"),
 ("Engineer", "100000", "2"),
 ("Recruiter", "70000", "3");
 

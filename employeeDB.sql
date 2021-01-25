@@ -28,15 +28,3 @@ CREATE TABLE employee (
   PRIMARY KEY (id),
   FOREIGN KEY (role_id) REFERENCES `role`(id)
 );
-
-INSERT INTO department (department) VALUE ("IT");
-
-INSERT INTO `role` (title, salary, department_id)
-VALUES 
-("Developer", "100000", "1"),
-("Engineer", "99999", "1");
-
-INSERT INTO employee (first_name, last_name, role_id)
-VALUES 
-("Chomie", "Usaneerungrueng", "1"),
-("Will", "Nguyen", "2");
