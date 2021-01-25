@@ -22,7 +22,7 @@ npm install *dependency*
 ```
 
 ## Usage
-[Walkthrough Video](https://drive.google.com/file/d/14rnjXosHUzUtfstmy6XPt8gZtEL8Zzo5/view)</br>
+[Walkthrough Video](https://drive.google.com/file/d/1vjL7vJ6wA-YHFK34HZD4YKaIQww08NQA/view)</br>
 ![Walkthrough GIF](./walkthrough.gif)
 
 ## License
