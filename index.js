@@ -73,29 +73,29 @@ const table = { // Global constant for chosen tables
 function select(chosen) {
   const query = ["e.id, e.first_name, e.last_name, r.title, d.department, r.salary",
     "e JOIN role r ON e.role_id = r.id JOIN department d ON r.department_id = d.id"]
-  chosen !== "employee" ?
+  chosen !== "employee" ? 
     display = `SELECT * FROM ${chosen} ORDER BY id` :
     display = `SELECT ${query[0]} FROM ${chosen} ${query[1]} ORDER BY e.id`
 }
 
+// Generates an array of name and value based on given task and chosen table
 function list(task, chosen, target) {
   var key, arr = []
   task === "Add" ? key = table[chosen][2] : key = chosen
-
   db.query(`SELECT * FROM ${key}`, async (err, res) => {
     if (err) throw err
     for await (i of res) {
       switch (key) {
-        case "role": arr.push(i.title); break
-        case "department": arr.push(i.department); break
-        default: arr.push(`${i.first_name} ${i.last_name}`)
+        case "role": arr.push({ name: i.title, value: i.id }); break
+        case "department": arr.push({ name: i.department, value: i.id }); break
+        default: arr.push({ name: `${i.first_name} ${i.last_name}`, value: i.id })
       }
     }
-    task === "Add" ?
-      add(chosen, arr, target) : update(task, chosen, arr)
+    task === "Add" ? add(chosen, arr, target) : update(task, chosen, arr)
   })
 }
 
+// Prompts for new info to to be added/updated
 function add(chosen, arr, target) {
   inquirer.prompt([{
     type: "input",
@@ -113,14 +113,8 @@ function add(chosen, arr, target) {
     message: `Select ${table[chosen][2]}:`,
     choices: arr
   }]).then(async res => {
-    var id = Object.keys(res)[2]
-    if (id) {
-      res[id] = await getID(table[chosen][2], res[id])
-    }
     var query = `INSERT INTO ${chosen} SET ?`
-    if (target) {
-      query = `UPDATE ${chosen} SET ? WHERE ${table[chosen][0]} = "${target}"`
-    }
+    if (target) { query = `UPDATE ${chosen} SET ? WHERE id = "${target}"` }
     db.query(query, { ...res }, (err, res) => {
       if (err) throw err
       print(display)
@@ -128,6 +122,7 @@ function add(chosen, arr, target) {
   })
 }
 
+// Prompts for an item to be updated/deleted
 function update(task, chosen, arr) {
   inquirer.prompt({
     type: "list",
@@ -135,15 +130,12 @@ function update(task, chosen, arr) {
     message: `Select ${chosen}:`,
     choices: arr
   }).then(res => {
-    if (task === "Update") {
-      list("Add", chosen, res.item.split(" ")[0])
-    } else {
-      var query = `DELETE FROM ${chosen} WHERE ${table[chosen][0]} = "${res.item.split(" ")[0]}"`
-      db.query(query, (err, res) => {
-          if (err) throw err
-          print(display)
-        })
-    }
+    task === "Update" ? 
+      list("Add", chosen, res.item) :
+      db.query(`DELETE FROM ${chosen} WHERE id = "${res.item}"`, (err, res) => {
+        if (err) throw err
+        print(display)
+      })
   })
 }
 
@@ -151,20 +143,7 @@ function update(task, chosen, arr) {
 function print(display) {
   db.query(display, (err, res) => {
     if (err) throw err
-    console.log(" ")
-    console.table(res)
-    console.log(" ")
+    console.table(" ", res)
     main()
-  })
-}
-
-// Gets an ID that matches the input
-function getID(chosen, input) {
-  return new Promise((resolve, reject) => {
-    var query = `SELECT * FROM ${chosen} WHERE ${table[chosen][0]} = "${input.split(" ")[0]}"`
-    db.query(query, (err, res) => {
-      if (err) throw err
-      resolve(res[0].id)
-    })
   })
 }
