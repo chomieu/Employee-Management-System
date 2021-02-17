@@ -18,7 +18,7 @@ git clone git@github.com:chomieu/Team-Profile-Generator.git
 ```
 3. Install any dependencies
 ```
-npm install *dependency*
+npm install
 ```
 
 ## Usage
